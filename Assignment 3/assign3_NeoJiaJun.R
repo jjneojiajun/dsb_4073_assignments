@@ -176,29 +176,36 @@ str(responses_df)
 # Remove String Columns 
 # Interest in Music
 responses_music_df <- responses_df[, 3:19]
-responses_music_df <- cbind(responses_music_df, Gender=(responses_df$Gender))
+responses_music_df_with_gender  <- cbind(responses_music_df, Gender=(responses_df$Gender))
 str(responses_music_df)
+str(responses_music_df_with_gender)
+
 
 # Interest in Movies 
 responses_movies_df <- responses_df[,21:31]
-responses_movies_df <- cbind(responses_movies_df, Gender=(responses_df$Gender))
+responses_movies_df_with_gender <- cbind(responses_movies_df, Gender=(responses_df$Gender))
 str(responses_movies_df)
+str(responses_movies_df_with_gender)
 
 # Interests 
 responses_interests_df <- responses_df[, 32:63]
-responses_interests_df <- cbind(responses_interests_df, Gender=(responses_df$Gender))
+responses_interests_df_with_gender  <- cbind(responses_interests_df, Gender=(responses_df$Gender))
 str(responses_interests_df)
+str(responses_interests_df_with_gender)
+
 
 # Fears
 responses_fear_df <- responses_df[, 65:73]
-responses_fear_df <- cbind(responses_fear_df, Gender=(responses_df$Gender))
+responses_fear_df_with_gender  <- cbind(responses_fear_df, Gender=(responses_df$Gender))
 str(responses_fear_df)
+str(responses_fear_df_with_gender)
+
 
 #######################################################
 # K Means                                             #
 #######################################################
 
-# Optimal Number Of Clusters for Music
+# Optimal Number Of Clusters for Music Without Gender
 fviz_nbclust(responses_music_df, kmeans, method = "gap_stat")
 set.seed(101)
 responses_music_df.res <- kmeans(responses_music_df, 3, nstart = 25)
@@ -206,6 +213,18 @@ fviz_cluster(responses_music_df.res, data = responses_music_df,
              ellipse.type = "convex",
              palette = "jco",
              ggtheme = theme_minimal())
+
+# Optimal Number Of Clusters for Music With Gender
+fviz_nbclust(responses_music_df_with_gender, kmeans, method = "gap_stat")
+set.seed(101)
+responses_music_df_with_gender.res <- kmeans(responses_music_df, 3, nstart = 25)
+fviz_cluster(responses_music_df_with_gender.res, data = responses_music_df_with_gender,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+
+# We can see minimal effect on the cluster when gender is added into play for 
+# Music
 
 # Optimal Number of Clusters for Movies
 fviz_nbclust(responses_movies_df, kmeans, method = "gap_stat")
@@ -216,6 +235,17 @@ fviz_cluster(responses_movies_df.res, data = responses_movies_df,
              palette = "jco",
              ggtheme = theme_minimal())
 
+fviz_nbclust(responses_movies_df_with_gender, kmeans, method = "gap_stat")
+set.seed(101)
+responses_movies_df_with_gender.res <- kmeans(responses_movies_df_with_gender, 3, nstart = 25)
+fviz_cluster(responses_movies_df_with_gender.res, data = responses_movies_df_with_gender,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+
+# Again, we can see minimal effect on the cluster when gender is added into play for 
+# Music
+
 # Optimal Number of Clusters for Interests 
 fviz_nbclust(responses_interests_df, kmeans, method = "gap_stat")
 set.seed(101)
@@ -225,20 +255,47 @@ fviz_cluster(responses_interests_df.res, data = responses_interests_df,
              palette = "jco",
              ggtheme = theme_minimal())
 
+fviz_nbclust(responses_interests_df_with_gender, kmeans, method = "gap_stat")
+responses_interests_df_with_gender.res <- kmeans(responses_interests_df_with_gender, 6, nstart = 25)
+fviz_cluster(responses_interests_df_with_gender.res, data = responses_interests_df_with_gender,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+
+# Again, we can see minimal effect on the cluster when gender is added into play for 
+# Interest
+
 # Optimal Number of Clusters for Fear
 fviz_nbclust(responses_fear_df, kmeans, method = "gap_stat")
 set.seed(101)
-responses_fear_df.res <- kmeans(responses_fear_df, 2, nstart = 25)
+responses_fear_df.res <- kmeans(responses_fear_df, 5, nstart = 25)
 fviz_cluster(responses_fear_df.res, data = responses_fear_df,
              ellipse.type = "convex",
              palette = "jco",
              ggtheme = theme_minimal())
 
-# There's a possiblilty that cluster analysis is affected by Gender
 
-# This can be seen in the differences in the optimal clusters
- 
-# Each interest seems to have varying effect for gender. This can be fully seen via
-# the fear clusters. 
+fviz_nbclust(responses_fear_df_with_gender, kmeans, method = "gap_stat")
+set.seed(101)
+responses_fear_df_with_gender.res <- kmeans(responses_fear_df_with_gender, 2, nstart = 25)
+fviz_cluster(responses_fear_df_with_gender.res, data = responses_fear_df_with_gender,
+             ellipse.type = "convex",
+             palette = "jco",
+             ggtheme = theme_minimal())
+
+# Finally, we can see a huge effect on gender for the fears.
+# Ironically, this maybe is the most true as more females are more afraid of certain
+# things as compared to a man.
+
+# For the most defining cluster, I will have to say that the cluster that provided the most information is definitely the fear
+# where there's clear distinctions.
+
+# Based on these 4 categories that I filtered out from the data.
+# I can say that Gender does not cause a huge impact on each cluster tested except for fear
+# I also will say that it is not a major factor in regards to clusters.
+
+# This is also held true via the code based by where we can see the difference between female and male for each sub-sub categories: 
+# https://www.kaggle.com/miroslavsabo/analyzing-gender-differences 
+
 
 
