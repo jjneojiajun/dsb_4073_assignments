@@ -1,0 +1,1299 @@
+---
+title: "cryptocurrencies"
+author: "JiaJun Neo"
+date: "19/04/2018"
+output:
+  html_document :                   # custom style for HTML
+    # theme of html document
+    # theme of code highlight                                 
+    # table of contents
+    theme       : paper             # "default", "cerulean", "journal",
+                                    # "flatly", "readable", "spacelab",
+                                    # "united", "cosmo", "lumen", "paper", 
+                                    # "sandstone", "simplex", "yeti"
+    highlight   : pygments          # "default", "tango", "pygments",
+                                    # "kate",  "monochrome", "espresso",
+                                    # "zenburn", "haddock", "textmate"
+    toc         : true
+    toc_depth   : 2
+    
+  pdf_document  : default           # default style for PDF
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(fig.width = 12, fig.height = 4)
+```
+***********************************************************
+
+# Initial Setup
+
+Install and load the essential R packages for Time Series analysis -- `tseries` and `forecast`.
+
+```{r}
+# install.packages("tseries")
+# install.packages("forecast")
+# install.packages("ggplot2")
+library(tseries)
+library(forecast)
+library("ggplot2")
+```
+
+Now we read and view the structure of the csv file downloaded from Kaggle.com 
+
+```{r}
+all_crypto <- read.csv("crypto-markets.csv")
+
+# Structure of the CSV File
+str(all_crypto)
+```
+
+# Preprocessing
+
+The data is in the format where all the cryptocurrencies are in the symbols and is actually stacked into a row.
+
+This section will be focusing on getting the data into what we actually want.
+
+The cryptocurrencies that we want are:
+
+Bitcoin, Ethereum, Ripple, Bitcoin Cash and Litecoin
+
+The columns that we need:
+
+Symbol, Date, Open and Close
+
+The date of cryptocurrencies that we need: 
+"2017-04-01" - "2018-04-15"
+
+```{r}
+# ==============================================================
+# Pre-processing
+# ==============================================================
+
+# Get the cryptocurrencies that we want
+# ==============================================================
+# BTC, ETH, XRP, BCH, LTC
+# ==============================================================
+
+btc <- all_crypto[all_crypto$symbol == 'BTC',]
+eth <- all_crypto[all_crypto$symbol == 'ETH',]
+xrp <- all_crypto[all_crypto$symbol == 'XRP',]
+bch <- all_crypto[all_crypto$symbol == 'BCH',]
+
+ltc <- all_crypto[all_crypto$symbol == 'LTC',]
+
+# Filter the columns:
+# ===============================================================
+# Column we need : symbol, date, open, close 
+# ===============================================================
+
+btc_final <- data.frame(btc$symbol, btc$date, btc$open, btc$close)
+colnames(btc_final) <- c("symbol", "date", "open", "close")
+
+eth_final <- data.frame(eth$symbol, eth$date, eth$open, eth$close)
+colnames(eth_final) <- c("symbol", "date", "open", "close")
+
+xrp_final <- data.frame(xrp$symbol, xrp$date, xrp$open, xrp$close)
+colnames(xrp_final) <- c("symbol", "date", "open", "close")
+
+bch_final <- data.frame(bch$symbol, bch$date, bch$open, bch$close)
+colnames(bch_final) <- c("symbol", "date", "open", "close")
+
+ltc_final <- data.frame(ltc$symbol, ltc$date, ltc$open, ltc$close)
+colnames(ltc_final) <- c("symbol", "date", "open", "close")
+
+# Format the date & symbol
+# ================================================================
+# Current implementation is Factor
+# ================================================================
+btc_final$date <- as.Date(as.factor(btc_final$date))
+btc_final$symbol <- as.character(as.factor(btc_final$symbol))
+
+eth_final$date <- as.Date(as.factor(eth_final$date))
+eth_final$symbol <- as.character(as.factor(eth_final$symbol))
+
+xrp_final$date <- as.Date(as.factor(xrp_final$date))
+xrp_final$symbol <- as.character(as.factor(xrp_final$symbol))
+
+bch_final$date <- as.Date(as.factor(bch_final$date))
+bch_final$symbol <- as.character(as.factor(bch_final$symbol))
+
+ltc_final$date <- as.Date(as.factor(ltc_final$date))
+ltc_final$symbol <- as.character(as.factor(ltc_final$symbol))
+
+# ==============================================================
+# Sorting the date 
+# ==============================================================
+
+btc_sorted_final <- btc_final[btc_final$date >= "2017-04-01" & btc_final$date <= "2018-04-15",]
+eth_sorted_final <- eth_final[eth_final$date >= "2017-04-01" & eth_final$date <= "2018-04-15",]
+xrp_sorted_final <- xrp_final[xrp_final$date >= "2017-04-01" & xrp_final$date <= "2018-04-15",]
+bch_sorted_final <- bch_final[bch_final$date >= "2017-04-01" & bch_final$date <= "2018-04-15",]
+ltc_sorted_final <- ltc_final[ltc_final$date >= "2017-04-01" & ltc_final$date <= "2018-04-15",]
+
+```
+
+# BITCOIN
+
+Bitcoin is currently the number 1 cryptocurrency in the world. This is due to the first mover advantage and most people heard of bitcoin. 
+
+For all cryptocurrencies, they showed a huge spike in December 2017 when Bitcoin actually beat a lot of company in value which was personally absurd to me. 
+
+```{r }
+# plot open price
+ggplot() + 
+  geom_line(data = btc_sorted_final, aes(x = date, y = open, color="Open Price")) +
+  geom_line(data = btc_sorted_final, aes(x = date, y = close, color="Close Price"))
+
+summary(btc_sorted_final$open)
+summary(btc_sorted_final$close)
+```
+
+### Moving Average of Bitcoin [Weekly]
+
+Since the price of cryptocurrencies are so volatile. I decided to use a rolling moving average to stabilize the data slightly.
+
+```{r }
+btc_latest_model <- btc_sorted_final[btc_sorted_final$date >= "2017-04-15" & btc_sorted_final$date <= "2018-04-15",]
+btc_latest_model$open_ma = ma(btc_latest_model$open, order=7) # Weekly Open Moving Average
+
+btc_latest_model$close_ma = ma(btc_latest_model$close, order=7) # Weekly Close Moving Average
+
+ggplot() + 
+  geom_line(data = btc_latest_model, aes(x = date, y = open, color="open prices")) +
+  geom_line(data = btc_latest_model, aes(x = date, y = close, color="close prices")) +
+  geom_line(data = btc_latest_model, aes(x = date, y = open_ma, color="weekly open ma")) + 
+  geom_line(data = btc_latest_model, aes(x = date, y= close_ma, color="weekly close ma"))
+
+```
+
+### Creating Stationary Data for Open Moving Average 
+
+```{r}
+btc_open_ma <- ts(na.omit(btc_latest_model$open_ma))
+
+# Stationarity
+adf.test(btc_open_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+
+```
+
+```{r }
+btcLog <- log(btc_open_ma)
+plot(btcLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(btcLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+btcLogDiff <- diff(btcLog)
+plot(btcLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(btcLogDiff)
+# Stop if p-value < 0.05
+```
+
+### ACF and PACF of Bitcoin Open Moving Average
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(btcLogDiff, main='ACF For BTC Differenced Series')
+pacf(btcLogDiff, main='PACF For BTC Differenced Series')
+par(op)
+```
+
+### Arima of Open Price Based on Guess
+
+```{r }
+arimaFit <- arima(btcLogDiff, order = c(1,0,0))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+
+arimaFitFC <- forecast(btcLogDiff, model = arimaFit, h = 10)
+plot(btcLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r }
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Finding Optimal Arima of Bitcoin
+
+```{r}
+auto.arima(btcLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Arima Optimal Plots
+
+```{r }
+arimaOpt <- arima(btcLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+arimaOptFC <- forecast(btcLogDiff, model = arimaOpt, h = 10)
+plot(btcLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+### Bitcoin Seasonal? 
+
+```{r}
+auto.arima(btcLogDiff,                   # the dataset
+           seasonal = TRUE,             # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+No! Bitcoin is not seasonal and thus we just utilize the auto.arima above.
+
+```{r}
+# Check the performance/accuracy
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+### Bitcoin Close Price Stationarity 
+
+```{r}
+btc_close_ma <- ts(na.omit(btc_latest_model$close_ma))
+
+# Stationarity
+adf.test(btc_close_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+```
+
+```{r }
+btcCloseLog <- log(btc_close_ma)
+plot(btcCloseLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(btcCloseLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+btcCloseLogDiff <- diff(btcCloseLog)
+plot(btcCloseLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(btcCloseLogDiff)
+# Stop if p-value < 0.05
+```
+
+### Bitcoin Close Price's ACF and PACF
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(btcCloseLogDiff, main='ACF For BTC Differenced Series')
+pacf(btcCloseLogDiff, main='PACF For BTC Differenced Series')
+par(op)
+```
+
+### Bitcoin Close Price Arima Guess
+
+```{r }
+# Arima Based on guessing
+arimaFit <- arima(btcCloseLogDiff, order = c(4,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+arimaFitFC <- forecast(btcCloseLogDiff, model = arimaFit, h = 10)
+plot(btcCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Optimal Arima Close Price
+```{r}
+auto.arima(btcCloseLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Bitcoin Close Forecast Plot
+
+```{r}
+arimaOpt <- arima(btcCloseLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+# Forecast using optimal ARIMA
+# Within the training dataset
+arimaOptFC <- forecast(btcCloseLogDiff, model = arimaOpt, h = 10)
+plot(btcCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+We know moving average bitcoin is not seasonal! Thus we are moving on!
+
+# Ethereum
+
+Ethereum is the 2nd cryptocurrency in the world. It can create smart contracts today the price is at 50% loss compared to Dec 2017.
+
+```{r }
+# plot open price
+ggplot() + 
+  geom_line(data = eth_sorted_final, aes(x = date, y = open, color="Open Price")) +
+  geom_line(data = eth_sorted_final, aes(x = date, y = close, color="Close Price"))
+
+summary(eth_sorted_final$open)
+summary(eth_sorted_final$close)
+```
+
+### Moving Average of Ethereum [Weekly]
+
+Since the price of cryptocurrencies are so volatile. I decided to use a rolling moving average to stabilize the data slightly.
+
+```{r }
+eth_latest_model <- eth_sorted_final[eth_sorted_final$date >= "2017-04-15" & eth_sorted_final$date <= "2018-04-15",]
+eth_latest_model$open_ma = ma(eth_latest_model$open, order=7) # Weekly Open Moving Average
+
+eth_latest_model$close_ma = ma(eth_latest_model$close, order=7) # Weekly Close Moving Average
+
+ggplot() + 
+  geom_line(data = eth_latest_model, aes(x = date, y = open, color="open prices")) +
+  geom_line(data = eth_latest_model, aes(x = date, y = close, color="close prices")) +
+  geom_line(data = eth_latest_model, aes(x = date, y = open_ma, color="weekly open ma")) + 
+  geom_line(data = eth_latest_model, aes(x = date, y= close_ma, color="weekly close ma"))
+
+```
+
+### Creating Stationary Data for Open Moving Average 
+
+```{r}
+eth_open_ma <- ts(na.omit(eth_latest_model$open_ma))
+
+# Stationarity
+adf.test(eth_open_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+
+```
+
+```{r }
+ethLog <- log(eth_open_ma)
+plot(ethLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ethLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+ethLogDiff <- diff(ethLog)
+plot(ethLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ethLogDiff)
+# Stop if p-value < 0.05
+```
+
+### ACF and PACF of Bitcoin Open Moving Average
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(ethLogDiff, main='ACF For ETH Differenced Series')
+pacf(ethLogDiff, main='PACF For ETH Differenced Series')
+par(op)
+```
+
+### Arima of Open Price Based on Guess
+
+```{r }
+arimaFit <- arima(ethLogDiff, order = c(4,0,5))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+
+arimaFitFC <- forecast(ethLogDiff, model = arimaFit, h = 10)
+plot(ethLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r }
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Finding Optimal Arima of Ethereum
+
+```{r}
+auto.arima(ethLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Arima Optimal Plots
+
+```{r }
+arimaOpt <- arima(ethLogDiff, order = c(3,0,5))
+arimaOpt
+plot(arimaOpt)
+
+arimaOptFC <- forecast(ethLogDiff, model = arimaOpt, h = 10)
+plot(ethLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+### Ethereum Seasonal? 
+
+```{r}
+auto.arima(ethLogDiff,                   # the dataset
+           seasonal = TRUE,             # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+No! Ethereum is not seasonal and thus we just utilize the auto.arima above.
+
+```{r}
+# Check the performance/accuracy
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+### Ethereum Close Price Stationarity 
+
+```{r}
+eth_close_ma <- ts(na.omit(eth_latest_model$close_ma))
+
+# Stationarity
+adf.test(eth_close_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+```
+
+```{r}
+ethCloseLog <- log(eth_close_ma)
+plot(ethCloseLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ethCloseLog)
+# Stop if p-value < 0.05
+```
+
+```{r}
+ethCloseLogDiff <- diff(ethCloseLog)
+plot(ethCloseLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ethCloseLogDiff)
+# Stop if p-value < 0.05
+```
+
+### Ethereum Close Price's ACF and PACF
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(ethCloseLogDiff, main='ACF For BTC Differenced Series')
+pacf(ethCloseLogDiff, main='PACF For BTC Differenced Series')
+par(op)
+```
+
+### Ethereum Close Price Arima Guess
+
+```{r }
+# Arima Based on guessing
+arimaFit <- arima(ethCloseLogDiff, order = c(4,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+arimaFitFC <- forecast(ethCloseLogDiff, model = arimaFit, h = 10)
+plot(ethCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Optimal Arima Close Price
+```{r}
+auto.arima(ethCloseLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Ethereum Close Forecast Plot
+
+```{r}
+arimaOpt <- arima(ethCloseLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+# Forecast using optimal ARIMA
+# Within the training dataset
+arimaOptFC <- forecast(ethCloseLogDiff, model = arimaOpt, h = 10)
+plot(ethCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+# Ripple
+
+Ripple is the 3rd cryptocurrency in the world. It aim is to help deal with bank transaction easily and faster. $3 was the highest price.
+
+```{r }
+# plot open price
+ggplot() + 
+  geom_line(data = xrp_sorted_final, aes(x = date, y = open, color="Open Price")) +
+  geom_line(data = xrp_sorted_final, aes(x = date, y = close, color="Close Price"))
+
+summary(xrp_sorted_final$open)
+summary(xrp_sorted_final$close)
+```
+
+### Moving Average of Ripple [Weekly]
+
+Since the price of cryptocurrencies are so volatile. I decided to use a rolling moving average to stabilize the data slightly.
+
+```{r }
+xrp_latest_model <- xrp_sorted_final[xrp_sorted_final$date >= "2017-04-15" & xrp_sorted_final$date <= "2018-04-15",]
+xrp_latest_model$open_ma = ma(xrp_latest_model$open, order=7) # Weekly Open Moving Average
+
+xrp_latest_model$close_ma = ma(xrp_latest_model$close, order=7) # Weekly Close Moving Average
+
+ggplot() + 
+  geom_line(data = xrp_latest_model, aes(x = date, y = open, color="open prices")) +
+  geom_line(data = xrp_latest_model, aes(x = date, y = close, color="close prices")) +
+  geom_line(data = xrp_latest_model, aes(x = date, y = open_ma, color="weekly open ma")) + 
+  geom_line(data = xrp_latest_model, aes(x = date, y= close_ma, color="weekly close ma"))
+
+```
+
+### Creating Stationary Data for Open Moving Average 
+
+```{r}
+xrp_open_ma <- ts(na.omit(xrp_latest_model$open_ma))
+
+# Stationarity
+adf.test(xrp_open_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+
+```
+
+```{r }
+xrpLog <- log(xrp_open_ma)
+plot(xrpLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(xrpLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+xrpLogDiff <- diff(xrpLog)
+plot(xrpLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(xrpLogDiff)
+# Stop if p-value < 0.05
+```
+
+### ACF and PACF of Ripple Open Moving Average
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(xrpLogDiff, main='ACF For XRP Differenced Series')
+pacf(xrpLogDiff, main='PACF For XRP Differenced Series')
+par(op)
+```
+
+### Arima of Open Price Based on Guess
+
+```{r }
+arimaFit <- arima(xrpLogDiff, order = c(2,0,0))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+
+arimaFitFC <- forecast(xrpLogDiff, model = arimaFit, h = 10)
+plot(xrpLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r }
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Finding Optimal Arima of Ripple
+
+```{r}
+auto.arima(xrpLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Arima Optimal Plots
+
+```{r }
+arimaOpt <- arima(xrpLogDiff, order = c(1,0,0))
+arimaOpt
+plot(arimaOpt)
+
+arimaOptFC <- forecast(xrpLogDiff, model = arimaOpt, h = 10)
+plot(xrpLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+### Ripple Seasonal? 
+
+```{r}
+auto.arima(xrpLogDiff,                   # the dataset
+           seasonal = TRUE,             # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+No! Ripple is not seasonal and thus we just utilize the auto.arima above.
+
+```{r}
+# Check the performance/accuracy
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+### Ripple Close Price Stationarity 
+
+```{r}
+xrp_close_ma <- ts(na.omit(xrp_latest_model$close_ma))
+
+# Stationarity
+adf.test(eth_close_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+```
+
+```{r}
+xrpCloseLog <- log(xrp_close_ma)
+plot(xrpCloseLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(xrpCloseLog)
+# Stop if p-value < 0.05
+```
+
+```{r}
+xrpCloseLogDiff <- diff(xrpCloseLog)
+plot(xrpCloseLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(xrpCloseLogDiff)
+# Stop if p-value < 0.05
+```
+
+### Ripple Close Price's ACF and PACF
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(xrpCloseLogDiff, main='ACF For XRP Differenced Series')
+pacf(xrpCloseLogDiff, main='PACF For XRP Differenced Series')
+par(op)
+```
+
+### Ripple Close Price Arima Guess
+
+```{r }
+# Arima Based on guessing
+arimaFit <- arima(xrpCloseLogDiff, order = c(4,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+arimaFitFC <- forecast(xrpCloseLogDiff, model = arimaFit, h = 10)
+plot(xrpCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Optimal Arima Close Price
+```{r}
+auto.arima(xrpCloseLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Ripple Close Forecast Plot
+
+```{r}
+arimaOpt <- arima(xrpCloseLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+# Forecast using optimal ARIMA
+# Within the training dataset
+arimaOptFC <- forecast(xrpCloseLogDiff, model = arimaOpt, h = 10)
+plot(xrpCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+# Bitcoin Cash
+
+```{r }
+# plot open price
+ggplot() + 
+  geom_line(data = bch_sorted_final, aes(x = date, y = open, color="Open Price")) +
+  geom_line(data = bch_sorted_final, aes(x = date, y = close, color="Close Price"))
+
+summary(bch_sorted_final$open)
+summary(bch_sorted_final$close)
+```
+
+### Moving Average of Bitcoin Cash [Weekly]
+
+Since the price of cryptocurrencies are so volatile. I decided to use a rolling moving average to stabilize the data slightly.
+
+```{r }
+bch_latest_model <- bch_sorted_final[bch_sorted_final$date >= "2017-04-15" & bch_sorted_final$date <= "2018-04-15",]
+bch_latest_model$open_ma = ma(bch_latest_model$open, order=7) # Weekly Open Moving Average
+
+bch_latest_model$close_ma = ma(bch_latest_model$close, order=7) # Weekly Close Moving Average
+
+ggplot() + 
+  geom_line(data = bch_latest_model, aes(x = date, y = open, color="open prices")) +
+  geom_line(data = bch_latest_model, aes(x = date, y = close, color="close prices")) +
+  geom_line(data = bch_latest_model, aes(x = date, y = open_ma, color="weekly open ma")) + 
+  geom_line(data = bch_latest_model, aes(x = date, y= close_ma, color="weekly close ma"))
+
+```
+
+### Creating Stationary Data for Open Moving Average 
+
+```{r}
+bch_open_ma <- ts(na.omit(bch_latest_model$open_ma))
+
+# Stationarity
+adf.test(bch_open_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+
+```
+
+```{r }
+bchLog <- log(bch_open_ma)
+plot(bchLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(bchLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+bchLogDiff <- diff(bchLog)
+plot(bchLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(bchLogDiff)
+# Stop if p-value < 0.05
+```
+
+### ACF and PACF of Bitcoin Cash Open Moving Average
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(bchLogDiff, main='ACF For XRP Differenced Series')
+pacf(bchLogDiff, main='PACF For XRP Differenced Series')
+par(op)
+```
+
+### Arima of Open Price Based on Guess
+
+```{r }
+arimaFit <- arima(bchLogDiff, order = c(3,0,3))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+
+arimaFitFC <- forecast(bchLogDiff, model = arimaFit, h = 10)
+plot(bchLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r }
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Finding Optimal Arima of Bitcoin Cash
+
+```{r}
+auto.arima(bchLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Arima Optimal Plots
+
+```{r }
+arimaOpt <- arima(bchLogDiff, order = c(2,0,3))
+arimaOpt
+plot(arimaOpt)
+
+arimaOptFC <- forecast(bchLogDiff, model = arimaOpt, h = 10)
+plot(bchLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+### Bitcoin Cash Seasonal? 
+
+```{r}
+auto.arima(bchLogDiff,                   # the dataset
+           seasonal = TRUE,             # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+No! Bitcoin Cash is not seasonal and thus we just utilize the auto.arima above.
+
+```{r}
+# Check the performance/accuracy
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+### Bitcoin Cash Close Price Stationarity 
+
+```{r}
+bch_close_ma <- ts(na.omit(bch_latest_model$close_ma))
+
+# Stationarity
+adf.test(bch_close_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+```
+
+```{r}
+bchCloseLog <- log(bch_close_ma)
+plot(bchCloseLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(bchCloseLog)
+# Stop if p-value < 0.05
+```
+
+```{r}
+bchCloseLogDiff <- diff(bchCloseLog)
+plot(bchCloseLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(bchCloseLogDiff)
+# Stop if p-value < 0.05
+```
+
+### Bitcoin Cash Close Price's ACF and PACF
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(bchCloseLogDiff, main='ACF For BCH Differenced Series')
+pacf(bchCloseLogDiff, main='PACF For BCH Differenced Series')
+par(op)
+```
+
+### Bitcoin Cash Close Price Arima Guess
+
+```{r }
+# Arima Based on guessing
+arimaFit <- arima(bchCloseLogDiff, order = c(4,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+arimaFitFC <- forecast(bchCloseLogDiff, model = arimaFit, h = 10)
+plot(bchCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Optimal Arima Close Price
+```{r}
+auto.arima(bchCloseLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Bitcoin Cash Close Forecast Plot
+
+```{r}
+arimaOpt <- arima(bchCloseLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+# Forecast using optimal ARIMA
+# Within the training dataset
+arimaOptFC <- forecast(bchCloseLogDiff, model = arimaOpt, h = 10)
+plot(bchCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+# Litecoin
+
+```{r }
+# plot open price
+ggplot() + 
+  geom_line(data = ltc_sorted_final, aes(x = date, y = open, color="Open Price")) +
+  geom_line(data = ltc_sorted_final, aes(x = date, y = close, color="Close Price"))
+
+summary(ltc_sorted_final$open)
+summary(ltc_sorted_final$close)
+```
+
+### Moving Average of Litecoin [Weekly]
+
+Since the price of cryptocurrencies are so volatile. I decided to use a rolling moving average to stabilize the data slightly.
+
+```{r }
+ltc_latest_model <- ltc_sorted_final[ltc_sorted_final$date >= "2017-04-15" & ltc_sorted_final$date <= "2018-04-15",]
+ltc_latest_model$open_ma = ma(ltc_latest_model$open, order=7) # Weekly Open Moving Average
+
+ltc_latest_model$close_ma = ma(ltc_latest_model$close, order=7) # Weekly Close Moving Average
+
+ggplot() + 
+  geom_line(data = ltc_latest_model, aes(x = date, y = open, color="open prices")) +
+  geom_line(data = ltc_latest_model, aes(x = date, y = close, color="close prices")) +
+  geom_line(data = ltc_latest_model, aes(x = date, y = open_ma, color="weekly open ma")) + 
+  geom_line(data = ltc_latest_model, aes(x = date, y= close_ma, color="weekly close ma"))
+
+```
+
+### Creating Stationary Data for Open Moving Average 
+
+```{r}
+ltc_open_ma <- ts(na.omit(ltc_latest_model$open_ma))
+
+# Stationarity
+adf.test(ltc_open_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+
+```
+
+```{r }
+ltcLog <- log(ltc_open_ma)
+plot(ltcLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ltcLog)
+# Stop if p-value < 0.05
+```
+
+```{r }
+ltcLogDiff <- diff(ltcLog)
+plot(ltcLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ltcLogDiff)
+# Stop if p-value < 0.05
+```
+
+### ACF and PACF of LiteCoin Open Moving Average
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(ltcLogDiff, main='ACF For BCH Differenced Series')
+pacf(ltcLogDiff, main='PACF For BCH Differenced Series')
+par(op)
+```
+
+### Arima of Open Price Based on Guess
+
+```{r }
+arimaFit <- arima(ltcLogDiff, order = c(3,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+
+arimaFitFC <- forecast(ltcLogDiff, model = arimaFit, h = 10)
+plot(ltcLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r }
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Finding Optimal Arima of Litecoin
+
+```{r}
+auto.arima(ltcLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### Arima Optimal Plots
+
+```{r }
+arimaOpt <- arima(ltcLogDiff, order = c(2,0,1))
+arimaOpt
+plot(arimaOpt)
+
+arimaOptFC <- forecast(ltcLogDiff, model = arimaOpt, h = 10)
+plot(ltcLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+### LiteCoin Seasonal? 
+
+```{r}
+auto.arima(ltcLogDiff,                   # the dataset
+           seasonal = TRUE,             # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+No! Litecoin is not seasonal and thus we just utilize the auto.arima above.
+
+```{r}
+# Check the performance/accuracy
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
+
+### LiteCoin Close Price Stationarity 
+
+```{r}
+ltc_close_ma <- ts(na.omit(ltc_latest_model$close_ma))
+
+# Stationarity
+adf.test(ltc_close_ma, alternative = "stationary")
+# Stop if p-value < 0.05
+```
+
+```{r}
+ltcCloseLog <- log(ltc_close_ma)
+plot(ltcCloseLog, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ltcCloseLog)
+# Stop if p-value < 0.05
+```
+
+```{r}
+ltcCloseLogDiff <- diff(ltcCloseLog)
+plot(ltcCloseLogDiff, type="l", col = "blue", 
+     lwd = 3, xlab = "", ylab = "")
+adf.test(ltcCloseLogDiff)
+# Stop if p-value < 0.05
+```
+
+### Litecoin Close Price's ACF and PACF
+
+```{r }
+op <- par(mfrow = c(1, 2))
+acf(ltcCloseLogDiff, main='ACF For XRP Differenced Series')
+pacf(ltcCloseLogDiff, main='PACF For XRP Differenced Series')
+par(op)
+```
+
+### Litecoin Close Price Arima Guess
+
+```{r }
+# Arima Based on guessing
+arimaFit <- arima(ltcCloseLogDiff, order = c(4,0,2))
+arimaFit            # check the coefficients
+plot(arimaFit)
+
+arimaFitFC <- forecast(ltcCloseLogDiff, model = arimaFit, h = 10)
+plot(ltcCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaFitFC$fitted, type="l", col = "red", lwd = 2)
+
+plot(arimaFitFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaFit), lag.max = 80)
+```
+
+### Optimal Arima Close Price
+```{r}
+auto.arima(ltcCloseLogDiff,                   # the dataset
+           seasonal = FALSE,            # seasonality
+           stationary = TRUE,           # stationarity
+           max.p = 5, max.q = 5,        # range of p,q (non-seasonal)
+           max.P = 5, max.Q = 5,        # range of P,Q (seasonal)
+           max.d = 2, max.D = 2,        # range of d,D (differences)
+           start.p = 1, start.q = 1,    # start for stepwise search
+           start.P = 1, start.Q = 1,    # start for stepwise search 
+           ic = "aic",                  # criteria to compare
+           stepwise = TRUE,             # stepwise selection (faster)
+           trace = TRUE)                # all ARIMA models reported
+```
+
+### LiteCoin Close Forecast Plot
+
+```{r}
+arimaOpt <- arima(ltcCloseLogDiff, order = c(1,0,1))
+arimaOpt
+plot(arimaOpt)
+
+# Forecast using optimal ARIMA
+# Within the training dataset
+arimaOptFC <- forecast(ltcCloseLogDiff, model = arimaOpt, h = 10)
+plot(ltcCloseLogDiff, type="l", col = "lightblue", 
+     lwd = 3, xlab = "", ylab = "")
+points(arimaOptFC$fitted, type="l", col = "red", lwd = 2)
+# Beyond the training dataset
+plot(arimaOptFC)
+```
+
+```{r}
+tsdisplay(residuals(arimaOpt), lag.max = 80)
+```
