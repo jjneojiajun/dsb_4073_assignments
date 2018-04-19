@@ -19,7 +19,8 @@ library(tseries)
 library(forecast)
 library(rvest)
 
-Quandl.api_key('ept8xkvWs3rySahsZqoy')
+# Please fill in the API key! You can create an account in Quandl to have access to your own API key.
+Quandl.api_key('')
 
 # -------------------------------------------------------
 # Define UI for the application (for input parameters)
